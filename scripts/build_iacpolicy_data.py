@@ -32,8 +32,13 @@ import sys
 from collections import defaultdict
 
 
-def run_checkov(src: str) -> dict:
-    """Run Checkov over *src* and return parsed JSON results."""
+def run_checkov(src: str) -> list[dict] | dict:
+    """Run Checkov over *src* and return parsed JSON results.
+
+    Checkov may emit either a single result block or a list of blocks (one per
+    framework, e.g. terraform + secrets). Return the parsed value as-is;
+    ``build_items`` aggregates across every block so no framework is dropped.
+    """
     try:
         proc = subprocess.run(
             ["checkov", "-d", src, "-o", "json", "--compact", "--quiet"],
@@ -46,9 +51,7 @@ def run_checkov(src: str) -> dict:
     out = proc.stdout.strip()
     if not out:
         sys.exit(f"checkov produced no JSON output.\nstderr:\n{proc.stderr}")
-    data = json.loads(out)
-    # checkov may emit a list of framework result blocks or a single block.
-    return data[0] if isinstance(data, list) else data
+    return json.loads(out)
 
 
 def checkov_version() -> str:
@@ -64,7 +67,8 @@ def _snippet_for(file_path: str, line_range: list[int] | None, src_root: str) ->
     """Best-effort extraction of the resource block text from its file."""
     abs_path = file_path if os.path.isabs(file_path) else os.path.join(src_root, file_path.lstrip("/"))
     try:
-        lines = open(abs_path, encoding="utf-8").read().splitlines()
+        with open(abs_path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
     except OSError:
         return ""
     if not line_range or len(line_range) != 2:
@@ -73,18 +77,26 @@ def _snippet_for(file_path: str, line_range: list[int] | None, src_root: str) ->
     return "\n".join(lines[max(0, start - 1): end])
 
 
-def build_items(result: dict, src_root: str, descriptions: dict, max_candidates: int) -> list[dict]:
-    """Group Checkov check records per resource into closed-set items."""
-    checks = result.get("results", {})
+def build_items(
+    result: list[dict] | dict, src_root: str, descriptions: dict, max_candidates: int
+) -> list[dict]:
+    """Group Checkov check records per resource into closed-set items.
+
+    Accepts either a single result block or a list of framework blocks and
+    aggregates passed/failed checks across all of them.
+    """
+    results = result if isinstance(result, list) else [result]
     per_resource: dict[str, dict] = defaultdict(
         lambda: {"passed": set(), "failed": set(), "meta": None}
     )
-    for status, key in (("passed", "passed_checks"), ("failed", "failed_checks")):
-        for rec in checks.get(key, []) or []:
-            res = rec.get("resource") or f"{rec.get('file_path')}::{rec.get('resource')}"
-            per_resource[res][status].add(rec.get("check_id"))
-            if per_resource[res]["meta"] is None:
-                per_resource[res]["meta"] = rec
+    for res_dict in results:
+        checks = res_dict.get("results", {})
+        for status, key in (("passed", "passed_checks"), ("failed", "failed_checks")):
+            for rec in checks.get(key, []) or []:
+                res = rec.get("resource") or f"{rec.get('file_path')}::{rec.get('resource')}"
+                per_resource[res][status].add(rec.get("check_id"))
+                if per_resource[res]["meta"] is None:
+                    per_resource[res]["meta"] = rec
 
     items: list[dict] = []
     rng = random.Random(42)
@@ -162,7 +174,8 @@ def main() -> None:
 
     descriptions = {}
     if args.descriptions:
-        descriptions = json.load(open(args.descriptions, encoding="utf-8"))
+        with open(args.descriptions, encoding="utf-8") as f:
+            descriptions = json.load(f)
 
     result = run_checkov(args.src)
     ver = checkov_version()

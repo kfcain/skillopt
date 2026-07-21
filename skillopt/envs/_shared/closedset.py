@@ -229,7 +229,15 @@ def run_batch(
                     outf.flush()
                 for fut in timed_out:
                     pending_futs.remove(fut)
-                    fut.cancel()
+                    # cancel() only stops futures that have not started; a running
+                    # task keeps going in the background until it returns. Note it
+                    # so background consumption is diagnosable.
+                    if not fut.cancel():
+                        print(
+                            f"    [rollout] timed-out task id={futs[fut]['id']} "
+                            "already running; it will finish in the background",
+                            flush=True,
+                        )
                     res = _timeout_result(futs[fut], "timeout", f"task-timeout-{task_timeout}s")
                     results.append(res)
                     completed += 1

@@ -1,0 +1,61 @@
+[
+  {
+    "id": "iac_tf_s3_101",
+    "task_type": "terraform_aws",
+    "iac_snippet": "resource \"aws_s3_bucket\" \"reports\" {\n  bucket = \"company-reports\"\n  acl    = \"private\"\n}",
+    "candidate_checks": ["CKV_AWS_18", "CKV_AWS_19", "CKV_AWS_20", "CKV_AWS_21"],
+    "candidate_check_descriptions": {
+      "CKV_AWS_18": "S3 bucket access logging is enabled",
+      "CKV_AWS_19": "S3 bucket has server-side encryption at rest configured",
+      "CKV_AWS_20": "S3 bucket does not grant public READ access",
+      "CKV_AWS_21": "S3 bucket versioning is enabled"
+    },
+    "violated_checks": ["CKV_AWS_18", "CKV_AWS_19", "CKV_AWS_21"]
+  },
+  {
+    "id": "iac_tf_sg_101",
+    "task_type": "terraform_aws",
+    "iac_snippet": "resource \"aws_security_group\" \"ssh_open\" {\n  ingress {\n    description = \"SSH admin\"\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}",
+    "candidate_checks": ["CKV_AWS_23", "CKV_AWS_24", "CKV_AWS_25"],
+    "candidate_check_descriptions": {
+      "CKV_AWS_23": "Every security group rule has a description",
+      "CKV_AWS_24": "No security group allows ingress from 0.0.0.0/0 to port 22 (SSH)",
+      "CKV_AWS_25": "No security group allows ingress from 0.0.0.0/0 to port 3389 (RDP)"
+    },
+    "violated_checks": ["CKV_AWS_24"]
+  },
+  {
+    "id": "iac_tf_rds_101",
+    "task_type": "terraform_aws",
+    "iac_snippet": "resource \"aws_db_instance\" \"analytics\" {\n  engine              = \"mysql\"\n  instance_class      = \"db.t3.large\"\n  publicly_accessible = true\n  storage_encrypted   = true\n}",
+    "candidate_checks": ["CKV_AWS_16", "CKV_AWS_17"],
+    "candidate_check_descriptions": {
+      "CKV_AWS_16": "RDS instance storage is encrypted at rest",
+      "CKV_AWS_17": "RDS instance is not publicly accessible"
+    },
+    "violated_checks": ["CKV_AWS_17"]
+  },
+  {
+    "id": "iac_tf_ebs_101",
+    "task_type": "terraform_aws",
+    "iac_snippet": "resource \"aws_ebs_volume\" \"cache\" {\n  availability_zone = \"us-west-2b\"\n  size              = 50\n  encrypted         = true\n}",
+    "candidate_checks": ["CKV_AWS_3"],
+    "candidate_check_descriptions": {
+      "CKV_AWS_3": "EBS volume is encrypted"
+    },
+    "violated_checks": []
+  },
+  {
+    "id": "iac_tf_s3_102",
+    "task_type": "terraform_aws",
+    "iac_snippet": "resource \"aws_s3_bucket\" \"public_site\" {\n  bucket = \"company-site\"\n  acl    = \"public-read\"\n  versioning { enabled = true }\n  server_side_encryption_configuration {\n    rule { apply_server_side_encryption_by_default { sse_algorithm = \"AES256\" } }\n  }\n  logging { target_bucket = \"audit-logs\" }\n}",
+    "candidate_checks": ["CKV_AWS_18", "CKV_AWS_19", "CKV_AWS_20", "CKV_AWS_21"],
+    "candidate_check_descriptions": {
+      "CKV_AWS_18": "S3 bucket access logging is enabled",
+      "CKV_AWS_19": "S3 bucket has server-side encryption at rest configured",
+      "CKV_AWS_20": "S3 bucket does not grant public READ access",
+      "CKV_AWS_21": "S3 bucket versioning is enabled"
+    },
+    "violated_checks": ["CKV_AWS_20"]
+  }
+]

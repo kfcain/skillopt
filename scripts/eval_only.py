@@ -59,6 +59,11 @@ def _register_builtins() -> None:
     except ImportError:
         pass
     try:
+        from skillopt.envs.iacpolicy.adapter import IacPolicyAdapter
+        _ENV_REGISTRY["iacpolicy"] = IacPolicyAdapter
+    except ImportError:
+        pass
+    try:
         from skillopt.envs.livemathematicianbench.adapter import LiveMathematicianBenchAdapter
         _ENV_REGISTRY["livemathematicianbench"] = LiveMathematicianBenchAdapter
     except ImportError:
